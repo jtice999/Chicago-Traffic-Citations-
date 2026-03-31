@@ -50,3 +50,13 @@ CREATE TABLE payments (
     payment_status VARCHAR(10) NOT NULL,           
     FOREIGN KEY (ticket_number) REFERENCES tickets(ticket_number)
 );
+CREATE TABLE locations (
+    location_id INT AUTO_INCREMENT PRIMARY KEY,
+    violation_location VARCHAR(255) NOT NULL,
+    zip_code VARCHAR(20) NOT NULL
+);
+CREATE TABLE issuing_information (
+    issuing_information_id INT AUTO_INCREMENT PRIMARY KEY,   
+    ticket_number BIGINT NOT NULL,              
+    officer_id VARCHAR(50) NOT NULL,          
+    unit_description VARCHAR(10) NOT NULL);
