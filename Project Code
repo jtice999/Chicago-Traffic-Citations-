@@ -19,7 +19,7 @@ CREATE TABLE vehicle_information (
     vehicle_make VARCHAR(50) NOT NULL           
 );
 
-CREATE Table violations (
+CREATE TABLE violations (
 	violation_id INT PRIMARY KEY AUTO_INCREMENT,
     violation_date DATE NOT NULL,
     
