@@ -1,9 +1,9 @@
 CREATE DATABASE chicago_traffic_citations;
 
 CREATE TABLE fines (
-    fine_level TINYINT NOT NULL,               -- 1 or 2
-    fine_amount DECIMAL(10,2) NOT NULL,       -- 0-600
-    PRIMARY KEY (fine_level, fine_amount)
+    fine_id INT AUTO_INCREMENT PRIMARY KEY,      
+    fine_level TINYINT NOT NULL,                 
+    fine_amount DECIMAL(10,2) NOT NULL CHECK 
 );
 
 CREATE TABLE violation_types (
@@ -13,7 +13,7 @@ CREATE TABLE violation_types (
 );
 
 CREATE TABLE vehicle_information (
-    license_plate_type VARCHAR(50) NOT NULL,
-    vehicle_make VARCHAR(50) NOT NULL,
-    PRIMARY KEY (license_plate_type, vehicle_make) 
+    vehicle_id INT AUTO_INCREMENT PRIMARY KEY,  
+    license_plate_type VARCHAR(50) NOT NULL,     
+    vehicle_make VARCHAR(50) NOT NULL           
 );
