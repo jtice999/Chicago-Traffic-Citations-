@@ -26,9 +26,9 @@ CREATE TABLE violations (
     violation_type_id INT NOT NULL,
     fine_id INT,
     vehicle_id INT,
-    -- location_id INT,
-    -- officer_id INT,
-    
+    location_id INT,
+	issuing_information_id   
+
     time_of_day VARCHAR(20),
     issued_by VARCHAR(20), -- camera or officer
     
