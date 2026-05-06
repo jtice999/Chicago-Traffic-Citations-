@@ -1,0 +1,126 @@
+/* Find all violations with fine amounts over $100 */
+SELECT v.violation_id, v.violation_date, f.fine_amount
+FROM violations v
+JOIN fines f ON v.fine_id = f.fine_id
+WHERE f.fine_amount > 100;
+
+
+/* List all violations issued by officers with vehicle information */
+SELECT v.violation_id, v.violation_date, vi.vehicle_make, 
+       vi.license_plate_type, i.officer_id
+FROM violations v
+JOIN vehicle_information vi ON v.vehicle_id = vi.vehicle_id
+JOIN issuing_information i ON v.issuing_information_id = i.issuing_information_id
+WHERE v.issued_by = 'officer';
+
+
+/* Count violations by location */
+SELECT l.violation_location, COUNT(*) as violation_count
+FROM violations v
+JOIN locations l ON v.location_id = l.location_id
+GROUP BY l.violation_location
+ORDER BY violation_count DESC;
+
+
+/* Add a new violation type */
+INSERT INTO violation_types (violation_code, description)
+VALUES ('SP25', 'Speeding 25mph over limit');
+
+
+/* Add a new fine */
+INSERT INTO fines (fine_level, fine_amount)
+VALUES (3, 250.00);
+
+
+/* Add a new violation*/
+INSERT INTO violations (violation_date, violation_type_id, fine_id, 
+                        vehicle_id, location_id, time_of_day, issued_by)
+VALUES ('2024-01-15', 1, 1, 1, 1, '14:30', 'camera');
+
+
+/* Update payment status for a specific ticket*/
+UPDATE payments 
+SET payment_status = 'PAID', 
+    current_amount_due = 0
+WHERE ticket_number = 123456789;
+
+
+/* Increase all fines by 10% for level 2 violations*/
+UPDATE fines 
+SET fine_amount = fine_amount * 1.10
+WHERE fine_level = 2;
+
+
+/* Delete unpaid violations older than 1 year*/
+DELETE FROM violations 
+WHERE violation_date < DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+AND violation_id IN (
+    SELECT v.violation_id 
+    FROM violations v
+    LEFT JOIN payments p ON v.violation_id = p.ticket_number
+    WHERE p.payment_status != 'PAID' OR p.payment_status IS NULL
+);
+
+
+/*Remove a violation type no longer used*/
+DELETE FROM violation_types 
+WHERE violation_type_id NOT IN (
+    SELECT DISTINCT violation_type_id FROM violations
+);
+
+CREATE VIEW vehicle_citation_summary AS
+SELECT 
+    COUNT(*) as total_citations,
+    COUNT(DISTINCT violation_date) as citation_days,
+    SUM(f.fine_amount) as total_fines_owed,
+    AVG(f.fine_amount) as avg_fine_per_citation,
+    MAX(violation_date) as most_recent_citation
+FROM violations v
+JOIN fines f ON v.fine_id = f.fine_id
+GROUP BY v.vehicle_id
+HAVING COUNT(*) > 1;
+
+CREATE VIEW time_location_citation_patterns AS
+SELECT 
+    l.violation_location,
+    l.zip_code,
+    v.time_of_day,
+    v.issued_by,
+    COUNT(*) as citation_count,
+    COUNT(DISTINCT DATE(v.violation_date)) as unique_days,
+    ROUND(COUNT(*) / COUNT(DISTINCT DATE(v.violation_date)), 1) as avg_citations_per_day
+FROM violations v
+JOIN locations l ON v.location_id = l.location_id
+GROUP BY l.violation_location, l.zip_code, v.time_of_day, v.issued_by
+HAVING COUNT(*) >= 5
+ORDER BY citation_count DESC;
+
+CREATE VIEW time_location_citation_patterns AS
+SELECT 
+    l.violation_location,
+    l.zip_code,
+    v.time_of_day,
+    v.issued_by,
+    COUNT(*) as citation_count,
+    COUNT(DISTINCT DATE(v.violation_date)) as unique_days,
+    ROUND(COUNT(*) / COUNT(DISTINCT DATE(v.violation_date)), 1) as avg_citations_per_day
+FROM violations v
+JOIN locations l ON v.location_id = l.location_id
+GROUP BY l.violation_location, l.zip_code, v.time_of_day, v.issued_by
+HAVING COUNT(*) >= 5
+ORDER BY citation_count DESC;
+
+CREATE VIEW payment_compliance_summary AS
+SELECT 
+    f.fine_level,
+    f.fine_amount as base_fine_amount,
+    COUNT(p.payment_id) as total_payments_made,
+    AVG(p.total_payments) as avg_payment_amount,
+    SUM(CASE WHEN p.payment_status = 'PAID' THEN 1 ELSE 0 END) as paid_count,
+    SUM(CASE WHEN p.payment_status = 'UNPAID' THEN 1 ELSE 0 END) as unpaid_count,
+    ROUND(SUM(CASE WHEN p.payment_status = 'PAID' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as payment_rate_percent
+FROM fines f
+LEFT JOIN violations v ON f.fine_id = v.fine_id
+LEFT JOIN payments p ON v.violation_id = p.ticket_number
+GROUP BY f.fine_level, f.fine_amount
+ORDER BY payment_rate_percent ASC;
