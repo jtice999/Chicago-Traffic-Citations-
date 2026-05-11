@@ -1,72 +1,84 @@
 /* Find all violations with fine amounts over $100 */
-SELECT v.violation_id, v.violation_date, f.fine_amount
-FROM violations v
-JOIN fines f ON v.fine_id = f.fine_id
+SELECT t.ticket_number, f.fine_amount
+FROM Ticket t
+JOIN Ticket_Fine tf
+	ON t.ticket_number = tf.ticket_number
+JOIN Fine f
+	ON tf.fine_id = f.fine_id
 WHERE f.fine_amount > 100;
 
 
 /* List all violations issued by officers with vehicle information */
-SELECT v.violation_id, v.violation_date, vi.vehicle_make, 
-       vi.license_plate_type, i.officer_id
-FROM violations v
-JOIN vehicle_information vi ON v.vehicle_id = vi.vehicle_id
-JOIN issuing_information i ON v.issuing_information_id = i.issuing_information_id
-WHERE v.issued_by = 'officer';
+SELECT t.ticket_number,
+		v.vehicle_make,
+        v.license_plate_type,
+        i.officer_id
+FROM Ticket t
+JOIN Vehicle v
+	ON t.vehicle_id = v.vehicle_id
+JOIN issuing i
+	ON t.issuing_id = i.issuing_id
+WHERE i.issued_by = 'officer';
 
 
 /* Count violations by location */
 SELECT l.violation_location, COUNT(*) as violation_count
-FROM violations v
-JOIN locations l ON v.location_id = l.location_id
+FROM Ticket t
+JOIN Location l
+	ON t.location_id = l.location_id
 GROUP BY l.violation_location
 ORDER BY violation_count DESC;
 
 
 /* Add a new violation type */
-INSERT INTO violation_types (violation_code, description)
+INSERT INTO Violation_types (violation_code, violation_description)
 VALUES ('SP25', 'Speeding 25mph over limit');
 
 
 /* Add a new fine */
-INSERT INTO fines (fine_level, fine_amount)
+INSERT INTO Fine (fine_level, fine_amount)
 VALUES (3, 250.00);
 
 
 /* Add a new violation*/
-INSERT INTO violations (violation_date, violation_type_id, fine_id, 
-                        vehicle_id, location_id, time_of_day, issued_by)
-VALUES ('2024-01-15', 1, 1, 1, 1, '14:30', 'camera');
+INSERT INTO Ticket (location_id, vehicle_id, time_of_day_id, issuing_id)
+VALUES (1, 1, 1, 1);
 
 
 /* Update payment status for a specific ticket*/
-UPDATE payments 
+UPDATE Payment 
 SET payment_status = 'PAID', 
     current_amount_due = 0
-WHERE ticket_number = 123456789;
+WHERE payment_id = 1;
 
 
 /* Increase all fines by 10% for level 2 violations*/
-UPDATE fines 
+UPDATE Fine 
 SET fine_amount = fine_amount * 1.10
 WHERE fine_level = 2;
 
 
-/* Delete unpaid violations older than 1 year*/
-DELETE FROM violations 
-WHERE violation_date < DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
-AND violation_id IN (
-    SELECT v.violation_id 
-    FROM violations v
-    LEFT JOIN payments p ON v.violation_id = p.ticket_number
-    WHERE p.payment_status != 'PAID' OR p.payment_status IS NULL
+/* Delete tickets with unpaid fines*/
+DELETE FROM Ticket 
+WHERE ticket_number IN (
+	SELECT ticket_number
+    FROM (
+		SELECT tf.ticket_number
+		FROM Ticket_Fine tf
+		JOIN Payment p
+			ON tf.fine_id = p.fine_id
+		WHERE p.payment_status != 'PAID' 
+			OR p.payment_status IS NULL
+	) AS unpaid_tickets
 );
 
 
 /*Remove a violation type no longer used*/
-DELETE FROM violation_types 
+DELETE FROM Violation_types 
 WHERE violation_type_id NOT IN (
-    SELECT DISTINCT violation_type_id FROM violations
+    SELECT DISTINCT violation_type_id FROM Ticket_Violation
 );
+
 
 CREATE VIEW vehicle_citation_summary AS
 SELECT 
