@@ -59,7 +59,7 @@ WHERE fine_level = 2;
 
 
 /* Delete tickets with unpaid fines*/
-DELETE FROM Ticket 
+DELETE FROM Ticket_Fine
 WHERE ticket_number IN (
 	SELECT ticket_number
     FROM (
@@ -82,57 +82,89 @@ WHERE violation_type_id NOT IN (
 
 CREATE VIEW vehicle_citation_summary AS
 SELECT 
-    COUNT(*) as total_citations,
-    COUNT(DISTINCT violation_date) as citation_days,
-    SUM(f.fine_amount) as total_fines_owed,
-    AVG(f.fine_amount) as avg_fine_per_citation,
-    MAX(violation_date) as most_recent_citation
-FROM violations v
-JOIN fines f ON v.fine_id = f.fine_id
-GROUP BY v.vehicle_id
-HAVING COUNT(*) > 1;
+    v.vehicle_id,
+    v.vehicle_make,
+    v.license_plate_type,
+    COUNT(t.ticket_number) AS total_citations,
+    SUM(f.fine_amount) AS total_fines_owed,
+    AVG(f.fine_amount) AS avg_fine_per_citation
+FROM Vehicle v
+JOIN Ticket t
+	ON v.vehicle_id = t.vehicle_id
+JOIN Ticket_Fine tf
+	ON t.ticket_number = tf.ticket_number
+JOIN Fine f
+	ON tf.fine_id = f.fine_id
+GROUP BY v.vehicle_id,
+		v.vehicle_make,
+		v.license_plate_type
+HAVING COUNT(t.ticket_number) > 1;
 
 CREATE VIEW time_location_citation_patterns AS
 SELECT 
     l.violation_location,
     l.zip_code,
-    v.time_of_day,
-    v.issued_by,
-    COUNT(*) as citation_count,
-    COUNT(DISTINCT DATE(v.violation_date)) as unique_days,
-    ROUND(COUNT(*) / COUNT(DISTINCT DATE(v.violation_date)), 1) as avg_citations_per_day
-FROM violations v
-JOIN locations l ON v.location_id = l.location_id
-GROUP BY l.violation_location, l.zip_code, v.time_of_day, v.issued_by
-HAVING COUNT(*) >= 5
-ORDER BY citation_count DESC;
-
-CREATE VIEW time_location_citation_patterns AS
-SELECT 
-    l.violation_location,
-    l.zip_code,
-    v.time_of_day,
-    v.issued_by,
-    COUNT(*) as citation_count,
-    COUNT(DISTINCT DATE(v.violation_date)) as unique_days,
-    ROUND(COUNT(*) / COUNT(DISTINCT DATE(v.violation_date)), 1) as avg_citations_per_day
-FROM violations v
-JOIN locations l ON v.location_id = l.location_id
-GROUP BY l.violation_location, l.zip_code, v.time_of_day, v.issued_by
+    td.time_category,
+    i.issued_by,
+    COUNT(*) AS citation_count
+FROM Ticket t
+JOIN Location l 
+	ON t.location_id = l.location_id
+JOIN Time_of_day td
+	ON t.time_of_day_id = td.time_of_day_id
+JOIN issuing i
+	ON t.issuing_id = i.issuing_id
+GROUP BY l.violation_location, 
+		l.zip_code, 
+		td.time_category,
+        i.issued_by
 HAVING COUNT(*) >= 5
 ORDER BY citation_count DESC;
 
 CREATE VIEW payment_compliance_summary AS
 SELECT 
     f.fine_level,
-    f.fine_amount as base_fine_amount,
-    COUNT(p.payment_id) as total_payments_made,
-    AVG(p.total_payments) as avg_payment_amount,
+    f.fine_amount AS base_fine_amount,
+    COUNT(p.payment_id) AS total_payments_made,
+    AVG(p.total_payments) AS avg_payment_amount,
+    
     SUM(CASE WHEN p.payment_status = 'PAID' THEN 1 ELSE 0 END) as paid_count,
     SUM(CASE WHEN p.payment_status = 'UNPAID' THEN 1 ELSE 0 END) as unpaid_count,
     ROUND(SUM(CASE WHEN p.payment_status = 'PAID' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as payment_rate_percent
-FROM fines f
-LEFT JOIN violations v ON f.fine_id = v.fine_id
-LEFT JOIN payments p ON v.violation_id = p.ticket_number
-GROUP BY f.fine_level, f.fine_amount
+    
+FROM Fine f
+LEFT JOIN Payment p
+	ON f.fine_id = p.fine_id
+
+GROUP BY f.fine_level, 
+		f.fine_amount
+        
 ORDER BY payment_rate_percent ASC;
+
+CREATE VIEW officer_ticket_summary AS
+SELECT
+	i.officer_id,
+    i.unit_description,
+    i.issued_by,
+    COUNT(t.ticket_number) AS total_tickets_issued
+FROM issuing i
+JOIN Ticket t
+	ON i.issuing_id = t.issuing_id
+GROUP BY
+	i.officer_id,
+    i.unit_description,
+    i.issued_by
+ORDER BY total_tickets_issued DESC;
+
+CREATE VIEW violation_type_frequency AS
+SELECT
+	vt.violation_code,
+    vt.violation_description,
+    COUNT(tv.ticket_number) AS total_violations
+FROM Violation_types vt
+JOIN Ticket_Violation tv
+	ON vt.violation_type_id = tv.violation_type_id
+GROUP BY
+	vt.violation_code,
+    vt.violation_description
+ORDER BY total_violations DESC;
