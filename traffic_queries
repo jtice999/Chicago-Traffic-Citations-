@@ -29,6 +29,7 @@ JOIN Location l
 GROUP BY l.violation_location
 ORDER BY violation_count DESC;
 
+SET SQL_SAFE_UPDATES = 0;
 
 /* Add a new violation type */
 INSERT INTO Violation_types (violation_code, violation_description)
@@ -79,6 +80,7 @@ WHERE violation_type_id NOT IN (
     SELECT DISTINCT violation_type_id FROM Ticket_Violation
 );
 
+SET SQL_SAFE_UPDATES = 1;
 
 CREATE VIEW vehicle_citation_summary AS
 SELECT 
